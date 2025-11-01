@@ -16,9 +16,13 @@ export const productService = {
     });
   },
 
-  findOne: async (id) => {
+  // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+  // Cambiamos el parámetro de 'id' a 'codigo' para que sea más claro.
+  // El controlador (product.controller.js) le pasará el 'codigo' de la URL a esta función.
+  findOne: async (codigo) => {
     return await prisma.product.findUnique({
-      where: { id },
+      // Buscamos por 'codigo' (que es @unique en tu schema) en lugar de 'id'
+      where: { codigo }, 
       include: {
         category: true,
         alimento: { include: { brand: true } },
@@ -28,6 +32,7 @@ export const productService = {
       },
     });
   },
+  // --- FIN DE LA CORRECCIÓN ---
 
   /**
    * Crea un producto. Requiere un objeto 'data' complejo
@@ -47,6 +52,9 @@ export const productService = {
     // Similar a 'create', el 'data' debe venir listo
     // Ej: { nombre: '...', precio: 150, 
     //      alimento: { update: { medidaKg: 12 } } }
+    
+    // NOTA: La actualización SÍ usa el 'id' (UUID), lo cual es correcto
+    // para las rutas de admin. Solo la vista PÚBLICA usa el 'codigo'.
     return await prisma.product.update({
       where: { id },
       data,

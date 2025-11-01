@@ -1,4 +1,4 @@
-
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,39 +10,31 @@ datasource db {
 
 // ----------------------------------------
 // Modelos de Localización (Región/Comuna)
-// Normalizado de: RegisterPage, UserProfilePage, ContactPage
 // ----------------------------------------
 
 model Region {
   id      Int      @id @default(autoincrement())
   nombre  String   @unique
-  // Relaciones
   comunas Comuna[]
   users   User[]
-  // Nota: ContactRequest usa strings, lo cual está bien para un "log" de formulario.
 }
 
 model Comuna {
   id       Int    @id @default(autoincrement())
   nombre   String
-  // Relación: Una comuna pertenece a una región
   region   Region @relation(fields: [regionId], references: [id])
   regionId Int
-  // Relaciones
   users    User[]
-
-  @@unique([nombre, regionId]) // Nombres de comunas se pueden repetir en distintas regiones
+  @@unique([nombre, regionId])
 }
 
 // ----------------------------------------
 // Modelos de Usuario y Autenticación
-// Normalizado de: RegisterPage, UserProfilePage, constants.js
 // ----------------------------------------
 
 model Role {
   id     Int    @id @default(autoincrement())
   nombre String @unique // "CLIENT", "SELLER", "ADMIN"
-  // Relación
   users  User[]
 }
 
@@ -52,40 +44,38 @@ model User {
   email           String    @unique
   nombre          String
   apellidos       String
-  password        String // Se guardará hasheada
+  password        String
   fechaNacimiento DateTime?
   direccion       String?
+  role            Role      @relation(fields: [roleId], references: [id])
+  roleId          Int
 
-  // Relación: Un usuario tiene un rol
-  role     Role @relation(fields: [roleId], references: [id])
-  roleId   Int // Clave foránea para Role
-
-  // Relación: Un usuario tiene una localización (opcional)
   region   Region? @relation(fields: [regionId], references: [id])
   regionId Int?
   comuna   Comuna? @relation(fields: [comunaId], references: [id])
   comunaId Int?
-
-  // Relación: Un usuario puede tener muchos pedidos
+  
+  // Relaciones
   orders   Order[]
+  
+  // --- ¡MODIFICACIÓN AQUÍ! ---
+  // Añadimos la relación 1-a-1 con el Carrito
+  cart     Cart?
 }
 
 // ----------------------------------------
 // Modelos de Productos y Catálogo
-// Normalizado de: ProductForm.jsx, ProductsPage.jsx
 // ----------------------------------------
 
 model Category {
   id       Int       @id @default(autoincrement())
-  nombre   String    @unique // "Alimentos", "Juguetes", "Accesorios", "Higiene"
-  // Relación
+  nombre   String    @unique
   products Product[]
 }
 
 model Brand {
-  id       Int       @id @default(autoincrement())
-  nombre   String    @unique // "Master Dog", "Pro Plan", etc.
-  // Relación
+  id        Int                 @id @default(autoincrement())
+  nombre    String              @unique
   alimentos AttributeAlimento[]
 }
 
@@ -98,20 +88,22 @@ model Product {
   precioOferta  Int?
   stock         Int      @default(0)
   stock_critico Int      @default(5)
-  imagenes      String[] // PostgreSQL soporta arrays de strings
+  imagenes      String[]
 
-  // Relación: Un producto pertenece a una categoría
   category   Category @relation(fields: [categoryId], references: [id])
   categoryId Int
 
-  // Relaciones 1-a-1: Un producto solo tendrá *una* de estas relaciones
   alimento   AttributeAlimento?
   juguete    AttributeJuguete?
   accesorio  AttributeAccesorio?
   higiene    AttributeHigiene?
-
-  // Relación: Un producto puede estar en muchos items de pedidos
+  
+  // Relaciones con Pedidos y Carrito
   orderItems OrderItem[]
+  
+  // --- ¡MODIFICACIÓN AQUÍ! ---
+  // Añadimos la relación con los Items del Carrito
+  cartItems  CartItem[]
 }
 
 // --- Tablas de Atributos Específicos (3NF) ---
@@ -120,22 +112,16 @@ model AttributeAlimento {
   id           String  @id @default(uuid())
   medidaKg     Int?
   tipoAlimento String?
-
-  // Relación 1-a-1: Este atributo pertenece a un producto
-  product   Product @relation(fields: [productId], references: [id])
-  productId String  @unique // @unique fuerza la relación 1-a-1
-
-  // Relación: Un alimento tiene una marca
-  brand     Brand? @relation(fields: [brandId], references: [id])
-  brandId   Int?
+  product      Product @relation(fields: [productId], references: [id])
+  productId    String  @unique
+  brand        Brand?  @relation(fields: [brandId], references: [id])
+  brandId      Int?
 }
 
 model AttributeJuguete {
   id        String  @id @default(uuid())
   material  String?
   tamano    String?
-
-  // Relación 1-a-1
   product   Product @relation(fields: [productId], references: [id])
   productId String  @unique
 }
@@ -144,57 +130,43 @@ model AttributeAccesorio {
   id            String  @id @default(uuid())
   tipoAccesorio String?
   color         String?
-
-  // Relación 1-a-1
-  product   Product @relation(fields: [productId], references: [id])
-  productId String  @unique
+  product       Product @relation(fields: [productId], references: [id])
+  productId     String  @unique
 }
 
 model AttributeHigiene {
   id            String  @id @default(uuid())
   contenidoNeto String?
   tipoMascota   String?
-
-  // Relación 1-a-1
-  product   Product @relation(fields: [productId], references: [id])
-  productId String  @unique
+  product       Product @relation(fields: [productId], references: [id])
+  productId     String  @unique
 }
 
 // ----------------------------------------
 // Modelos de Pedidos (Checkout)
-// Normalizado de: CheckoutPage.jsx, OrdersManagementPage.jsx
 // ----------------------------------------
 
 model Order {
   id           String    @id @default(uuid())
+  orderId      String    @unique // ej: "ORD-12345"
   orderDate    DateTime  @default(now())
-  status       String    @default("Procesando") // "Procesando", "Completado", "Cancelado"
+  status       String    @default("Procesando")
   total        Int
   shippingCost Int
-  shippingInfo Json // Guardar la info de envío (nombre, dirección) como un "snapshot" JSON es correcto
-
-  // Relación: Un pedido pertenece a un usuario
-  user     User   @relation(fields: [userId], references: [id])
-  userId   String
-
-  // Relación: Un pedido tiene muchos items
-  items    OrderItem[]
+  shippingInfo Json
+  user         User      @relation(fields: [userId], references: [id])
+  userId       String
+  items        OrderItem[]
 }
 
 model OrderItem {
-  id              String @id @default(uuid())
+  id              String  @id @default(uuid())
   quantity        Int
-  priceAtPurchase Int // Precio del producto al momento de la compra (incluyendo oferta)
-
-  // Relación: Pertenece a un pedido
-  order     Order  @relation(fields: [orderId], references: [id])
-  orderId   String
-
-  // Relación: Referencia a un producto
-  product   Product @relation(fields: [productId], references: [id])
-  productId String
-
-  // Un producto solo puede estar una vez por pedido
+  priceAtPurchase Int
+  order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId         String
+  product         Product @relation(fields: [productId], references: [id])
+  productId       String
   @@unique([orderId, productId])
 }
 
@@ -217,9 +189,42 @@ model ContactRequest {
   fecha   DateTime @default(now())
   nombre  String
   email   String
-  region  String // Está bien como String, es un registro, no un dato relacional
+  region  String
   comuna  String
   asunto  String
   mensaje String
-  estado  String   @default("Pendiente") // "Pendiente", "Respondido", "Cerrado"
+  estado  String   @default("Pendiente")
+}
+
+// ----------------------------------------
+// --- ¡NUEVOS MODELOS DE CARRITO! ---
+// ----------------------------------------
+
+// Modelo para el Carrito (1-a-1 con User)
+model Cart {
+  id     String @id @default(uuid())
+  
+  // Relación: Un carrito pertenece a UN usuario
+  user   User   @relation(fields: [userId], references: [id])
+  userId String @unique // @unique fuerza la relación 1-a-1
+
+  // Relación: Un carrito tiene MUCHOS items
+  items  CartItem[]
+}
+
+// Modelo para los Items del Carrito
+model CartItem {
+  id       String @id @default(uuid())
+  quantity Int    @default(1)
+
+  // Relación: Pertenece a UN carrito
+  cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cartId String
+
+  // Relación: Referencia a UN producto
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+
+  // Un producto solo puede estar una vez por carrito
+  @@unique([cartId, productId])
 }

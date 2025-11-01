@@ -9,16 +9,22 @@ export const orderController = {
   create: async (req, res) => {
     try {
       const userId = req.user.id; // Obtenido del token JWT
-      const { items, shippingInfo, shippingCost, total } = req.body; // Obtenido del frontend
+      
+      // --- ¡ESTA ES LA MODIFICACIÓN! ---
+      // 1. Extraemos el 'orderId' del body (junto con el resto)
+      const { items, shippingInfo, shippingCost, total, orderId } = req.body; 
 
       if (!items || items.length === 0) {
         return res.status(400).json({ message: 'El pedido debe tener al menos un item' });
       }
 
-      const newOrder = await orderService.create(userId, items, shippingInfo, shippingCost, total);
+      // 2. Pasamos el 'orderId' al servicio
+      const newOrder = await orderService.create(userId, items, shippingInfo, shippingCost, total, orderId);
       res.status(201).json(newOrder);
+      
     } catch (error) {
       console.error(error); // Loguea el error completo
+      // Mostramos el error específico (ej. "Stock insuficiente...")
       res.status(500).json({ message: 'Error al crear el pedido', error: error.message });
     }
   },
@@ -49,7 +55,7 @@ export const orderController = {
   },
 
   /**
-   * Un Admin/Vendedor obtiene UN pedido por ID.
+   * Un Admin/Vendedor/Cliente obtiene UN pedido por ID.
    */
   getOne: async (req, res) => {
     try {

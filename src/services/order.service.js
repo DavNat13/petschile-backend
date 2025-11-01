@@ -8,8 +8,11 @@ export const orderService = {
    * 2. Crea los Items del Pedido (OrderItems)
    * 3. Verifica y descuenta el stock de los Productos
    * Si algo falla (ej. no hay stock), TODA la operación se revierte.
+   *
+   * --- ¡MODIFICADO! ---
+   * 1. Añadimos 'orderId' a la firma de la función
    */
-  create: async (userId, items, shippingInfo, shippingCost, total) => {
+  create: async (userId, items, shippingInfo, shippingCost, total, orderId) => {
     
     return await prisma.$transaction(async (tx) => {
       // 1. Verificar stock y preparar datos de items
@@ -38,6 +41,8 @@ export const orderService = {
       // 2. Crear el Pedido y los OrderItems anidados
       const order = await tx.order.create({
         data: {
+          // --- ¡ESTA ES LA MODIFICACIÓN! ---
+          orderId: orderId, // 2. Añadimos el orderId al guardar en la BD
           userId,
           total,
           shippingCost,
@@ -69,6 +74,7 @@ export const orderService = {
 
   /**
    * Encuentra todos los pedidos de un usuario específico.
+   * (Esta función ya devuelve 'orderId' implícitamente)
    */
   findByUser: async (userId) => {
     return await prisma.order.findMany({
@@ -86,6 +92,7 @@ export const orderService = {
 
   /**
    * Encuentra todos los pedidos (para Admin/Vendedor).
+   * (Esta función ya devuelve 'orderId' implícitamente)
    */
   findAll: async () => {
     return await prisma.order.findMany({
@@ -96,6 +103,7 @@ export const orderService = {
 
   /**
    * Encuentra un pedido único por ID (para Admin/Vendedor).
+   * (Esta función ya devuelve 'orderId' implícitamente)
    */
   findOne: async (id) => {
     return await prisma.order.findUnique({

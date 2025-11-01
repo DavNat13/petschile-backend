@@ -10,19 +10,20 @@ router.use(checkJwt);
 
 // --- Rutas de Cliente ---
 
-// POST /api/orders (Un cliente crea su propio pedido)
-router.post('/', checkRole(['CLIENT']), orderController.create);
+// POST /api/orders (Un cliente o admin crea un pedido)
+router.post('/', checkRole(['CLIENT', 'ADMIN','SELLER']), orderController.create);
 
-// GET /api/orders/my-orders (Un cliente ve SUS propios pedidos)
-router.get('/my-orders', checkRole(['CLIENT']), orderController.getMyOrders);
+// GET /api/orders/my-orders (Un cliente O ADMIN ve SUS propios pedidos)
+router.get('/my-orders', checkRole(['CLIENT', 'ADMIN','SELLER']), orderController.getMyOrders);
 
 // --- Rutas de Admin/Vendedor ---
 
 // GET /api/orders (Admin/Vendedor ven TODOS los pedidos)
 router.get('/', checkRole(['ADMIN', 'SELLER']), orderController.getAll);
 
-// GET /api/orders/:id (Admin/Vendedor ven UN pedido específico)
-router.get('/:id', checkRole(['ADMIN', 'SELLER']), orderController.getOne);
+// GET /api/orders/:id (Cualquier rol logueado puede ver UN pedido específico por ID)
+// (Esto lo corregimos para PurchaseDetailPage)
+router.get('/:id', checkRole(['ADMIN', 'SELLER', 'CLIENT']), orderController.getOne);
 
 // PATCH /api/orders/:id (Admin/Vendedor actualizan estado del pedido)
 router.patch('/:id', checkRole(['ADMIN', 'SELLER']), orderController.updateStatus);
