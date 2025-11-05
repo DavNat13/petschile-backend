@@ -1,5 +1,6 @@
 // src/controllers/user.controller.js
 import { userService } from '../services/user.service.js';
+import { auditService } from '../services/audit.service.js';
 
 export const userController = {
   
@@ -36,8 +37,16 @@ export const userController = {
    */
   create: async (req, res) => {
     try {
-      // (Aquí deberías usar un 'validateUser' middleware)
       const newUser = await userService.create(req.body);
+
+      await auditService.createLog(
+        req.user.id,        // Quién (Admin)
+        'USER_CREATE',      // Qué (Acción)
+        'User',             // Dónde (Entidad)
+        newUser.id,         // ID de la entidad
+        { new: newUser }    // Cambios
+      );
+
       res.status(201).json(newUser);
     } catch (error) {
       if (error.code === 'P2002') {
@@ -53,10 +62,24 @@ export const userController = {
   update: async (req, res) => {
     try {
       const { id } = req.params;
-      const updatedUser = await userService.update(id, req.body);
-      if (!updatedUser) {
+
+      // 1. Obtenemos el estado "antiguo" para el log
+      const oldUser = await userService.findOne(id);
+      if (!oldUser) {
         return res.status(404).json({ message: 'Usuario no encontrado' });
       }
+
+      // 2. Actualizamos el usuario
+      const updatedUser = await userService.update(id, req.body);
+
+      await auditService.createLog(
+        req.user.id,
+        'USER_UPDATE',
+        'User',
+        updatedUser.id,
+        { old: oldUser, new: updatedUser } // Guardamos el antes y después
+      );
+
       res.status(200).json(updatedUser);
     } catch (error) {
       res.status(500).json({ message: 'Error al actualizar el usuario', error: error.message });
@@ -69,7 +92,24 @@ export const userController = {
   remove: async (req, res) => {
     try {
       const { id } = req.params;
+
+      // 1. Obtenemos el usuario que se va a eliminar
+      const userToDelete = await userService.findOne(id);
+      if (!userToDelete) {
+        return res.status(404).json({ message: 'Usuario no encontrado' });
+      }
+
+      // 2. Eliminamos el usuario
       await userService.remove(id);
+
+      await auditService.createLog(
+        req.user.id,
+        'USER_DELETE',
+        'User',
+        id,
+        { old: userToDelete } // Guardamos el objeto eliminado
+      );
+
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: 'Error al eliminar el usuario', error: error.message });

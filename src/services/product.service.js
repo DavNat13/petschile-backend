@@ -3,9 +3,12 @@ import { prisma } from '../config/prisma.js';
 
 export const productService = {
   
+  /**
+   * (PÚBLICO) Obtiene todos los productos ACTIVOS
+   */
   findAll: async () => {
     return await prisma.product.findMany({
-      // Incluimos la categoría y los atributos específicos
+      where: { status: 'ACTIVE' },
       include: {
         category: true,
         alimento: { include: { brand: true } },
@@ -15,46 +18,66 @@ export const productService = {
       },
     });
   },
-
-  // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
-  // Cambiamos el parámetro de 'id' a 'codigo' para que sea más claro.
-  // El controlador (product.controller.js) le pasará el 'codigo' de la URL a esta función.
-  findOne: async (codigo) => {
-    return await prisma.product.findUnique({
-      // Buscamos por 'codigo' (que es @unique en tu schema) en lugar de 'id'
-      where: { codigo }, 
-      include: {
-        category: true,
-        alimento: { include: { brand: true } },
-        juguete: true,
-        accesorio: true,
-        higiene: true,
-      },
-    });
-  },
-  // --- FIN DE LA CORRECCIÓN ---
 
   /**
-   * Crea un producto. Requiere un objeto 'data' complejo
-   * que el controlador (o middleware) debe construir.
+   * (PÚBLICO) Obtiene un producto por 'codigo' (SKU) si está ACTIVO
    */
+  findOneByCodigo: async (codigo) => {
+    return await prisma.product.findUnique({
+      where: { 
+        codigo: codigo,
+        status: 'ACTIVE'
+       }, 
+      include: {
+        category: true,
+        alimento: { include: { brand: true } },
+        juguete: true,
+        accesorio: true,
+        higiene: true,
+      },
+    });
+  },
+
+  /**
+   * (ADMIN) Obtiene TODOS los productos (activos y archivados).
+   */
+  findAllForAdmin: async () => {
+    return await prisma.product.findMany({
+      // Sin filtro de 'status'
+      include: {
+        category: true,
+        alimento: { include: { brand: true } },
+        juguete: true,
+        accesorio: true,
+        higiene: true,
+      },
+      orderBy: {
+        nombre: 'asc' // Ordenados alfabéticamente
+      }
+    });
+  },
+
+  /**
+   * (ADMIN) Obtiene un producto por 'id' (UUID) sin importar el estado.
+   */
+  findOneById: async (id) => {
+    return await prisma.product.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        alimento: { include: { brand: true } },
+        juguete: true,
+        accesorio: true,
+        higiene: true,
+      },
+    });
+  },
+
   create: async (data) => {
-    // El 'data' debe venir listo de Prisma (con escrituras anidadas)
-    // Ej: { nombre: '...', precio: 100, categoryId: 1, 
-    //      alimento: { create: { medidaKg: 10, brandId: 1 } } }
     return await prisma.product.create({ data });
   },
 
-  /**
-   * Actualiza un producto.
-   */
   update: async (id, data) => {
-    // Similar a 'create', el 'data' debe venir listo
-    // Ej: { nombre: '...', precio: 150, 
-    //      alimento: { update: { medidaKg: 12 } } }
-    
-    // NOTA: La actualización SÍ usa el 'id' (UUID), lo cual es correcto
-    // para las rutas de admin. Solo la vista PÚBLICA usa el 'codigo'.
     return await prisma.product.update({
       where: { id },
       data,
@@ -62,25 +85,39 @@ export const productService = {
   },
 
   /**
-   * Elimina un producto.
-   * IMPORTANTE: Prisma borrará en cascada los atributos (alimento, etc.)
-   * pero fallará si el producto está en un OrderItem.
-   * (Una mejor práctica sería "desactivar" el producto en lugar de borrarlo).
+   * (ADMIN) Archiva un producto (Soft Delete)
    */
   remove: async (id) => {
     try {
-      // Primero borramos los atributos específicos (buena práctica)
-      await prisma.attributeAlimento.deleteMany({ where: { productId: id } });
-      await prisma.attributeJuguete.deleteMany({ where: { productId: id } });
-      await prisma.attributeAccesorio.deleteMany({ where: { productId: id } });
-      await prisma.attributeHigiene.deleteMany({ where: { productId: id } });
+      // 1. Borramos todas las referencias en los carritos (seguro de hacer)
+      await prisma.cartItem.deleteMany({ where: { productId: id } });
       
-      // Luego borramos el producto
-      return await prisma.product.delete({ where: { id } });
+      // Ya NO comprobamos OrderItem.
+      // Ya NO borramos los Atributos (el producto debe mantenerlos).
+      // Simplemente actualizamos el estado a 'ARCHIVED'.
+       return await prisma.product.update({
+         where: { id: id },
+         data: { status: 'ARCHIVED' },
+       });
+      
     } catch (error) {
-      if (error.code === 'P2003') { // Error de Foreign Key
-        throw new Error('No se puede eliminar: El producto está asociado a uno o más pedidos.');
-      }
+      // Este catch es ahora solo para errores inesperados de la BD
+      console.error("Error en el servicio de archivar producto:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * (ADMIN) Restaura un producto cambiando su estado a 'ACTIVE'.
+   */
+  restore: async (id) => {
+    try {
+      return await prisma.product.update({
+        where: { id: id },
+        data: { status: 'ACTIVE' },
+      });
+    } catch (error) {
+      console.error("Error en el servicio de restaurar producto:", error);
       throw error;
     }
   },

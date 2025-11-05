@@ -21,7 +21,10 @@ app.use(helmet());
 // CORS: Permite peticiones SÓLO desde tu frontend de React
 // (Asegúrate de cambiar esto a la URL de tu sitio desplegado en producción)
 app.use(cors({ 
-  origin: 'https://petschile.netlify.app'
+  origin: [
+    'https://petschile.netlify.app', // URL de Producción
+    'http://localhost:5173'         // URL de Desarrollo Local
+  ]
 }));
 
 // Parsea el body de las peticiones JSON

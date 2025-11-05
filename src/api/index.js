@@ -9,6 +9,8 @@ import contactRoutes from './contact.routes.js';
 import categoryRoutes from './category.routes.js';
 import brandRoutes from './brand.routes.js';
 import cartRoutes from './cart.routes.js';
+import auditRoutes from './audit.routes.js';
+import mediaRoutes from './media.routes.js';
 
 const router = Router();
 
@@ -22,5 +24,7 @@ router.use('/contact', contactRoutes);
 router.use('/categories', categoryRoutes);
 router.use('/brands', brandRoutes);
 router.use('/cart', cartRoutes);
+router.use('/audit', auditRoutes);
+router.use('/media', mediaRoutes);
 
 export default router;

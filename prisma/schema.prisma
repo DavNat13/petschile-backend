@@ -54,13 +54,10 @@ model User {
   regionId Int?
   comuna   Comuna? @relation(fields: [comunaId], references: [id])
   comunaId Int?
-  
   // Relaciones
-  orders   Order[]
-  
-  // --- ¡MODIFICACIÓN AQUÍ! ---
-  // Añadimos la relación 1-a-1 con el Carrito
-  cart     Cart?
+  orders    Order[]
+  cart      Cart?
+  auditLogs AuditLog[]
 }
 
 // ----------------------------------------
@@ -89,20 +86,17 @@ model Product {
   stock         Int      @default(0)
   stock_critico Int      @default(5)
   imagenes      String[]
+  status        String   @default("ACTIVE") // "ACTIVE", "ARCHIVED"
 
   category   Category @relation(fields: [categoryId], references: [id])
   categoryId Int
 
-  alimento   AttributeAlimento?
-  juguete    AttributeJuguete?
-  accesorio  AttributeAccesorio?
-  higiene    AttributeHigiene?
-  
+  alimento  AttributeAlimento?
+  juguete   AttributeJuguete?
+  accesorio AttributeAccesorio?
+  higiene   AttributeHigiene?
   // Relaciones con Pedidos y Carrito
   orderItems OrderItem[]
-  
-  // --- ¡MODIFICACIÓN AQUÍ! ---
-  // Añadimos la relación con los Items del Carrito
   cartItems  CartItem[]
 }
 
@@ -112,7 +106,7 @@ model AttributeAlimento {
   id           String  @id @default(uuid())
   medidaKg     Int?
   tipoAlimento String?
-  product      Product @relation(fields: [productId], references: [id])
+  product      Product @relation(fields: [productId], references: [id], onDelete: Cascade) // onDelete añadido por si acaso
   productId    String  @unique
   brand        Brand?  @relation(fields: [brandId], references: [id])
   brandId      Int?
@@ -122,7 +116,7 @@ model AttributeJuguete {
   id        String  @id @default(uuid())
   material  String?
   tamano    String?
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId String  @unique
 }
 
@@ -130,7 +124,7 @@ model AttributeAccesorio {
   id            String  @id @default(uuid())
   tipoAccesorio String?
   color         String?
-  product       Product @relation(fields: [productId], references: [id])
+  product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId     String  @unique
 }
 
@@ -138,7 +132,7 @@ model AttributeHigiene {
   id            String  @id @default(uuid())
   contenidoNeto String?
   tipoMascota   String?
-  product       Product @relation(fields: [productId], references: [id])
+  product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId     String  @unique
 }
 
@@ -165,6 +159,8 @@ model OrderItem {
   priceAtPurchase Int
   order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderId         String
+  // --- NOTA: Aquí no ponemos onDelete: SetNull o Cascade, ---
+  // --- porque queremos que la BD falle si se intenta borrar un producto de un pedido. ---
   product         Product @relation(fields: [productId], references: [id])
   productId       String
   @@unique([orderId, productId])
@@ -197,34 +193,54 @@ model ContactRequest {
 }
 
 // ----------------------------------------
-// --- ¡NUEVOS MODELOS DE CARRITO! ---
+// Modelo de Auditoría
 // ----------------------------------------
 
-// Modelo para el Carrito (1-a-1 con User)
+model AuditLog {
+  id        String   @id @default(uuid())
+  timestamp DateTime @default(now())
+  action    String   // Ej: "PRODUCT_CREATE", "USER_UPDATE", "ORDER_STATUS_CHANGE"
+  entity    String   // Ej: "Product", "User", "Order"
+  entityId  String   // El ID de la entidad afectada
+  changes   Json?    // Opcional: JSON con { old: {...}, new: {...} }
+
+  // Relación con el usuario que hizo la acción
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+}
+
+// ----------------------------------------
+// --- ¡NUEVO MODELO DE BIBLIOTECA DE MEDIOS! ---
+// ----------------------------------------
+
+model MediaFile {
+  id        String   @id @default(uuid())
+  fileName  String   // El nombre original (ej: "perro-lindo.jpg")
+  url       String   // La URL segura de Cloudinary (ej: "https://res.cloudinary.com/...")
+  publicId  String   @unique // El ID que Cloudinary usa para borrar/modificar
+  fileType  String   // "image", "video", "file"
+  createdAt DateTime @default(now())
+}
+
+// ----------------------------------------
+// Modelos de Carrito
+// ----------------------------------------
+
 model Cart {
   id     String @id @default(uuid())
-  
-  // Relación: Un carrito pertenece a UN usuario
-  user   User   @relation(fields: [userId], references: [id])
-  userId String @unique // @unique fuerza la relación 1-a-1
-
-  // Relación: Un carrito tiene MUCHOS items
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique 
   items  CartItem[]
 }
 
-// Modelo para los Items del Carrito
 model CartItem {
-  id       String @id @default(uuid())
-  quantity Int    @default(1)
-
-  // Relación: Pertenece a UN carrito
-  cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  cartId String
-
-  // Relación: Referencia a UN producto
-  product   Product @relation(fields: [productId], references: [id])
+  id        String  @id @default(uuid())
+  quantity  Int     @default(1)
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cartId    String
+  // Aquí SÍ usamos onDelete: Cascade, porque si un producto se borra,
+  // también debe borrarse de los carritos.
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId String
-
-  // Un producto solo puede estar una vez por carrito
   @@unique([cartId, productId])
 }

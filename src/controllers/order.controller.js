@@ -1,5 +1,6 @@
 // src/controllers/order.controller.js
 import { orderService } from '../services/order.service.js';
+import { auditService } from '../services/audit.service.js';
 
 export const orderController = {
 
@@ -10,21 +11,17 @@ export const orderController = {
     try {
       const userId = req.user.id; // Obtenido del token JWT
       
-      // --- ¡ESTA ES LA MODIFICACIÓN! ---
-      // 1. Extraemos el 'orderId' del body (junto con el resto)
       const { items, shippingInfo, shippingCost, total, orderId } = req.body; 
 
       if (!items || items.length === 0) {
         return res.status(400).json({ message: 'El pedido debe tener al menos un item' });
       }
 
-      // 2. Pasamos el 'orderId' al servicio
       const newOrder = await orderService.create(userId, items, shippingInfo, shippingCost, total, orderId);
       res.status(201).json(newOrder);
       
     } catch (error) {
-      console.error(error); // Loguea el error completo
-      // Mostramos el error específico (ej. "Stock insuficiente...")
+      console.error(error); 
       res.status(500).json({ message: 'Error al crear el pedido', error: error.message });
     }
   },
@@ -76,16 +73,30 @@ export const orderController = {
   updateStatus: async (req, res) => {
     try {
       const { id } = req.params;
-      const { status } = req.body; // Ej: "Completado", "Cancelado"
+      const { status } = req.body; 
 
       if (!status) {
         return res.status(400).json({ message: 'Se requiere un estado' });
       }
 
-      const updatedOrder = await orderService.updateStatus(id, status);
-      if (!updatedOrder) {
+      // 1. Obtenemos el estado "antiguo" para el log
+      const oldOrder = await orderService.findOne(id);
+      if (!oldOrder) {
         return res.status(404).json({ message: 'Pedido no encontrado' });
       }
+
+      // 2. Actualizamos el estado
+      const updatedOrder = await orderService.updateStatus(id, status);
+
+      // Registramos solo el cambio de estado
+      await auditService.createLog(
+        req.user.id,
+        'ORDER_STATUS_UPDATE',
+        'Order',
+        updatedOrder.id,
+        { old: { status: oldOrder.status }, new: { status: updatedOrder.status } }
+      );
+
       res.status(200).json(updatedOrder);
     } catch (error) {
       res.status(500).json({ message: 'Error al actualizar el estado', error: error.message });
