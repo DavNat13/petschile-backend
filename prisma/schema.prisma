@@ -11,14 +11,12 @@ datasource db {
 // ----------------------------------------
 // Modelos de Localización (Región/Comuna)
 // ----------------------------------------
-
 model Region {
   id      Int      @id @default(autoincrement())
   nombre  String   @unique
   comunas Comuna[]
   users   User[]
 }
-
 model Comuna {
   id       Int    @id @default(autoincrement())
   nombre   String
@@ -31,13 +29,11 @@ model Comuna {
 // ----------------------------------------
 // Modelos de Usuario y Autenticación
 // ----------------------------------------
-
 model Role {
   id     Int    @id @default(autoincrement())
   nombre String @unique // "CLIENT", "SELLER", "ADMIN"
   users  User[]
 }
-
 model User {
   id              String    @id @default(uuid())
   run             String    @unique
@@ -49,11 +45,10 @@ model User {
   direccion       String?
   role            Role      @relation(fields: [roleId], references: [id])
   roleId          Int
-
-  region   Region? @relation(fields: [regionId], references: [id])
-  regionId Int?
-  comuna   Comuna? @relation(fields: [comunaId], references: [id])
-  comunaId Int?
+  region          Region?   @relation(fields: [regionId], references: [id])
+  regionId        Int?
+  comuna          Comuna?   @relation(fields: [comunaId], references: [id])
+  comunaId        Int?
   // Relaciones
   orders    Order[]
   cart      Cart?
@@ -63,7 +58,6 @@ model User {
 // ----------------------------------------
 // Modelos de Productos y Catálogo
 // ----------------------------------------
-
 model Category {
   id       Int       @id @default(autoincrement())
   nombre   String    @unique
@@ -71,9 +65,12 @@ model Category {
 }
 
 model Brand {
-  id        Int                 @id @default(autoincrement())
-  nombre    String              @unique
-  alimentos AttributeAlimento[]
+  id        Int       @id @default(autoincrement())
+  nombre    String    @unique
+  // --- ¡MODIFICADO! ---
+  // Ahora una marca tiene muchos productos
+  products  Product[]
+  // --- FIN ---
 }
 
 model Product {
@@ -91,27 +88,27 @@ model Product {
   category   Category @relation(fields: [categoryId], references: [id])
   categoryId Int
 
+  brand      Brand?   @relation(fields: [brandId], references: [id])
+  brandId    Int?
+
+
   alimento  AttributeAlimento?
   juguete   AttributeJuguete?
   accesorio AttributeAccesorio?
   higiene   AttributeHigiene?
-  // Relaciones con Pedidos y Carrito
   orderItems OrderItem[]
   cartItems  CartItem[]
 }
 
 // --- Tablas de Atributos Específicos (3NF) ---
-
 model AttributeAlimento {
   id           String  @id @default(uuid())
   medidaKg     Int?
   tipoAlimento String?
-  product      Product @relation(fields: [productId], references: [id], onDelete: Cascade) // onDelete añadido por si acaso
+  product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId    String  @unique
-  brand        Brand?  @relation(fields: [brandId], references: [id])
-  brandId      Int?
-}
 
+}
 model AttributeJuguete {
   id        String  @id @default(uuid())
   material  String?
@@ -119,7 +116,6 @@ model AttributeJuguete {
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId String  @unique
 }
-
 model AttributeAccesorio {
   id            String  @id @default(uuid())
   tipoAccesorio String?
@@ -127,19 +123,17 @@ model AttributeAccesorio {
   product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId     String  @unique
 }
-
 model AttributeHigiene {
   id            String  @id @default(uuid())
   contenidoNeto String?
   tipoMascota   String?
   product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId     String  @unique
+  productId String  @unique
 }
 
 // ----------------------------------------
 // Modelos de Pedidos (Checkout)
 // ----------------------------------------
-
 model Order {
   id           String    @id @default(uuid())
   orderId      String    @unique // ej: "ORD-12345"
@@ -152,15 +146,12 @@ model Order {
   userId       String
   items        OrderItem[]
 }
-
 model OrderItem {
   id              String  @id @default(uuid())
   quantity        Int
   priceAtPurchase Int
   order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderId         String
-  // --- NOTA: Aquí no ponemos onDelete: SetNull o Cascade, ---
-  // --- porque queremos que la BD falle si se intenta borrar un producto de un pedido. ---
   product         Product @relation(fields: [productId], references: [id])
   productId       String
   @@unique([orderId, productId])
@@ -169,7 +160,6 @@ model OrderItem {
 // ----------------------------------------
 // Modelos Autónomos (Blog, Contacto)
 // ----------------------------------------
-
 model BlogPost {
   id               String   @id @default(uuid())
   title            String
@@ -179,7 +169,6 @@ model BlogPost {
   author           String
   date             DateTime @default(now())
 }
-
 model ContactRequest {
   id      String   @id @default(uuid())
   fecha   DateTime @default(now())
@@ -195,7 +184,6 @@ model ContactRequest {
 // ----------------------------------------
 // Modelo de Auditoría
 // ----------------------------------------
-
 model AuditLog {
   id        String   @id @default(uuid())
   timestamp DateTime @default(now())
@@ -203,43 +191,36 @@ model AuditLog {
   entity    String   // Ej: "Product", "User", "Order"
   entityId  String   // El ID de la entidad afectada
   changes   Json?    // Opcional: JSON con { old: {...}, new: {...} }
-
-  // Relación con el usuario que hizo la acción
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
 }
 
 // ----------------------------------------
-// --- ¡NUEVO MODELO DE BIBLIOTECA DE MEDIOS! ---
+// Modelo de Biblioteca de Medios
 // ----------------------------------------
-
 model MediaFile {
   id        String   @id @default(uuid())
-  fileName  String   // El nombre original (ej: "perro-lindo.jpg")
-  url       String   // La URL segura de Cloudinary (ej: "https://res.cloudinary.com/...")
-  publicId  String   @unique // El ID que Cloudinary usa para borrar/modificar
-  fileType  String   // "image", "video", "file"
+  fileName  String
+  url       String
+  publicId  String   @unique
+  fileType  String
   createdAt DateTime @default(now())
 }
 
 // ----------------------------------------
 // Modelos de Carrito
 // ----------------------------------------
-
 model Cart {
   id     String @id @default(uuid())
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String @unique 
   items  CartItem[]
 }
-
 model CartItem {
   id        String  @id @default(uuid())
   quantity  Int     @default(1)
   cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
   cartId    String
-  // Aquí SÍ usamos onDelete: Cascade, porque si un producto se borra,
-  // también debe borrarse de los carritos.
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId String
   @@unique([cartId, productId])

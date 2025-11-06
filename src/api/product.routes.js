@@ -2,7 +2,8 @@
 import { Router } from 'express';
 import { productController } from '../controllers/product.controller.js';
 import { checkJwt, checkRole } from '../middlewares/auth.middleware.js';
-import { validateProduct } from '../middlewares/validation.middleware.js';
+// Importamos 'validateProduct' pero ya no lo usaremos en POST/PATCH
+import { validateProduct } from '../middlewares/validation.middleware.js'; 
 
 const router = Router();
 
@@ -34,7 +35,10 @@ router.get(
  */
 router.post(
   '/',
-  [checkJwt, checkRole(['ADMIN', 'SELLER']), validateProduct], // Array de middlewares
+  // --- CORRECCIÓN ---
+  // Se eliminó 'validateProduct' de este array.
+  // La validación compleja de Prisma la maneja el servicio.
+  [checkJwt, checkRole(['ADMIN', 'SELLER'])], 
   productController.create
 );
 
@@ -45,7 +49,9 @@ router.post(
  */
 router.patch(
   '/:id',
-  [checkJwt, checkRole(['ADMIN', 'SELLER']), validateProduct], 
+  // --- CORRECCIÓN ---
+  // Se eliminó 'validateProduct' de este array.
+  [checkJwt, checkRole(['ADMIN', 'SELLER'])], 
   productController.update
 );
 
@@ -73,4 +79,4 @@ router.delete(
   productController.remove
 );
 
-export default router;
+export default router;  

@@ -11,7 +11,10 @@ export const productService = {
       where: { status: 'ACTIVE' },
       include: {
         category: true,
-        alimento: { include: { brand: true } },
+        // --- ¡CORRECCIÓN! ---
+        brand: true, // La marca se incluye aquí
+        alimento: true, // 'alimento' ya no incluye 'brand'
+        // --- FIN ---
         juguete: true,
         accesorio: true,
         higiene: true,
@@ -30,7 +33,10 @@ export const productService = {
        }, 
       include: {
         category: true,
-        alimento: { include: { brand: true } },
+        // --- ¡CORRECCIÓN! ---
+        brand: true,
+        alimento: true,
+        // --- FIN ---
         juguete: true,
         accesorio: true,
         higiene: true,
@@ -43,16 +49,18 @@ export const productService = {
    */
   findAllForAdmin: async () => {
     return await prisma.product.findMany({
-      // Sin filtro de 'status'
       include: {
         category: true,
-        alimento: { include: { brand: true } },
+        // --- ¡CORRECCIÓN! ---
+        brand: true,
+        alimento: true,
+        // --- FIN ---
         juguete: true,
         accesorio: true,
         higiene: true,
       },
       orderBy: {
-        nombre: 'asc' // Ordenados alfabéticamente
+        nombre: 'asc'
       }
     });
   },
@@ -65,7 +73,10 @@ export const productService = {
       where: { id },
       include: {
         category: true,
-        alimento: { include: { brand: true } },
+        // --- ¡CORRECCIÓN! ---
+        brand: true,
+        alimento: true,
+        // --- FIN ---
         juguete: true,
         accesorio: true,
         higiene: true,
@@ -73,10 +84,20 @@ export const productService = {
     });
   },
 
+  /**
+   * Crea un producto.
+   * El 'data' viene del ProductForm (handleSubmit)
+   */
   create: async (data) => {
+    console.log('--- 4. Backend: Service (data) ---');
+    console.dir(data, { depth: null });
     return await prisma.product.create({ data });
   },
 
+  /**
+   * Actualiza un producto.
+   * El 'data' viene del ProductForm (handleSubmit)
+   */
   update: async (id, data) => {
     return await prisma.product.update({
       where: { id },
@@ -92,6 +113,7 @@ export const productService = {
       // 1. Borramos todas las referencias en los carritos (seguro de hacer)
       await prisma.cartItem.deleteMany({ where: { productId: id } });
       
+      // 2. ¡LÓGICA CORREGIDA!
       // Ya NO comprobamos OrderItem.
       // Ya NO borramos los Atributos (el producto debe mantenerlos).
       // Simplemente actualizamos el estado a 'ARCHIVED'.
@@ -101,7 +123,6 @@ export const productService = {
        });
       
     } catch (error) {
-      // Este catch es ahora solo para errores inesperados de la BD
       console.error("Error en el servicio de archivar producto:", error);
       throw error;
     }

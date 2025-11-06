@@ -36,13 +36,21 @@ export const cartService = {
           include: {
             product: {
               include: {
-                category: true, // Incluimos la categoría para aplanar en el frontend
-                alimento: { include: { brand: true } } // Y la marca
+                category: true, // Incluimos la categoría
+                
+                // --- ¡CORRECCIÓN AQUÍ! ---
+                // La marca (brand) ahora se incluye directamente desde el producto.
+                brand: true, 
+                // Y 'alimento' ya no necesita incluir 'brand'.
+                alimento: true,
+                juguete: true,
+                accesorio: true,
+                higiene: true,
+                // --- FIN DE CORRECCIÓN ---
               }
             }
           },
           orderBy: {
-            // Opcional: ordenar items, ej. por ID
             id: 'asc'
           }
         },
@@ -89,7 +97,6 @@ export const cartService = {
     }
 
     // 4. Usar 'upsert' para crear o actualizar el item
-    // 'upsert' = "update or insert" (actualiza si existe, inserta si no)
     const cartItem = await prisma.cartItem.upsert({
       where: {
         cartId_productId: {
@@ -97,13 +104,11 @@ export const cartService = {
           productId: productId,
         },
       },
-      // Qué hacer si NO existe (crear)
       create: {
         cartId: cart.id,
         productId: productId,
         quantity: quantity,
       },
-      // Qué hacer si SÍ existe (actualizar)
       update: {
         quantity: {
           increment: quantity, // Incrementa la cantidad existente
@@ -120,7 +125,6 @@ export const cartService = {
   updateCartItem: async (userId, productId, newQuantity) => {
     const cart = await getOrCreateCart(userId);
 
-    // Si la nueva cantidad es 0 o menos, lo tratamos como un 'remove'
     if (newQuantity <= 0) {
       return await cartService.removeFromCart(userId, productId);
     }

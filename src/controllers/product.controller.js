@@ -52,7 +52,10 @@ export const productController = {
    */
   create: async (req, res) => {
     try {
+      console.log('--- 3. Backend: Controller (req.body) ---');
+      console.dir(req.body, { depth: null });
       const newProduct = await productService.create(req.body);
+      
 
       await auditService.createLog(
         req.user.id,
