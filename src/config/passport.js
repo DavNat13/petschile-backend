@@ -14,7 +14,6 @@ export const jwtStrategy = new JwtStrategy(options, async (payload, done) => {
     const user = await prisma.user.findUnique({
       where: { id: payload.id },
       
-      // --- ¡ESTA ES LA CORRECCIÓN! ---
       // Ahora pedimos todos los campos que el UserProfilePage necesita
       select: { 
         id: true, 

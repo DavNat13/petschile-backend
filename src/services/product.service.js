@@ -11,10 +11,8 @@ export const productService = {
       where: { status: 'ACTIVE' },
       include: {
         category: true,
-        // --- ¡CORRECCIÓN! ---
-        brand: true, // La marca se incluye aquí
-        alimento: true, // 'alimento' ya no incluye 'brand'
-        // --- FIN ---
+        brand: true, 
+        alimento: true,
         juguete: true,
         accesorio: true,
         higiene: true,
@@ -33,10 +31,8 @@ export const productService = {
        }, 
       include: {
         category: true,
-        // --- ¡CORRECCIÓN! ---
         brand: true,
         alimento: true,
-        // --- FIN ---
         juguete: true,
         accesorio: true,
         higiene: true,
@@ -51,10 +47,8 @@ export const productService = {
     return await prisma.product.findMany({
       include: {
         category: true,
-        // --- ¡CORRECCIÓN! ---
         brand: true,
         alimento: true,
-        // --- FIN ---
         juguete: true,
         accesorio: true,
         higiene: true,
@@ -73,10 +67,8 @@ export const productService = {
       where: { id },
       include: {
         category: true,
-        // --- ¡CORRECCIÓN! ---
         brand: true,
         alimento: true,
-        // --- FIN ---
         juguete: true,
         accesorio: true,
         higiene: true,
@@ -112,11 +104,6 @@ export const productService = {
     try {
       // 1. Borramos todas las referencias en los carritos (seguro de hacer)
       await prisma.cartItem.deleteMany({ where: { productId: id } });
-      
-      // 2. ¡LÓGICA CORREGIDA!
-      // Ya NO comprobamos OrderItem.
-      // Ya NO borramos los Atributos (el producto debe mantenerlos).
-      // Simplemente actualizamos el estado a 'ARCHIVED'.
        return await prisma.product.update({
          where: { id: id },
          data: { status: 'ARCHIVED' },

@@ -5,7 +5,7 @@ import { mediaController } from '../controllers/media.controller.js';
 import { checkJwt, checkRole } from '../middlewares/auth.middleware.js';
 import { asyncHandler } from '../utils/errorHandler.js';
 
-// 1. Configuración de Multer para almacenamiento en memoria (sin cambios)
+// 1. Configuración de Multer para almacenamiento en memoria 
 const storage = multer.memoryStorage(); // Almacena el archivo en req.file.buffer
 const upload = multer({ 
   storage: storage,
@@ -16,7 +16,7 @@ const upload = multer({
 
 const router = Router();
 
-// 2. Protección Global (sin cambios)
+// 2. Protección Global  
 router.use(checkJwt);
 router.use(checkRole(['ADMIN', 'SELLER']));
 
@@ -31,18 +31,15 @@ router.get(
 );
 
 /**
- * --- ¡MODIFICADO! ---
  * @route   POST /api/media/upload
  * @desc    Sube uno o MÚLTIPLES archivos nuevos
  * @access  Private (Admin, Seller)
  */
 router.post(
   '/upload',
-  // 3. Cambiamos de .single('file') a .array('files', 10)
   upload.array('files', 10), 
   asyncHandler(mediaController.upload)
 );
-// --- FIN DE MODIFICACIÓN ---
 
 /**
  * @route   DELETE /api/media/:id
@@ -53,5 +50,12 @@ router.delete(
   '/:id',
   asyncHandler(mediaController.remove)
 );
+
+/**
+ * @route   GET /api/media/stats
+ * @desc    Obtiene estadísticas de medios para el dashboard
+ * @access  Private (Admin, Seller)
+ */
+router.get('/stats', asyncHandler(mediaController.getStats));
 
 export default router;

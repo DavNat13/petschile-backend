@@ -33,7 +33,6 @@ export const productController = {
     }
   },
 
-  // --- ¡AÑADIDO! ---
   /**
    * (ADMIN) Obtiene TODOS los productos (activos y archivados).
    */
@@ -45,7 +44,6 @@ export const productController = {
       res.status(500).json({ message: 'Error al obtener productos de admin', error: error.message });
     }
   },
-  // --- FIN DE ADICIÓN ---
 
   /**
    * Crea un nuevo producto.
@@ -120,7 +118,7 @@ export const productController = {
 
       await auditService.createLog(
         req.user.id,
-        'PRODUCT_ARCHIVE', // <-- Log de "Archivar"
+        'PRODUCT_ARCHIVE', 
         'Product',
         id,
         { old: productToArchive } 
@@ -133,7 +131,6 @@ export const productController = {
     }
   },
 
-  // --- ¡AÑADIDO! ---
   /**
    * Restaura un producto (cambia status a 'ACTIVE').
    */

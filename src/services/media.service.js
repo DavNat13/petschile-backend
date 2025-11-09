@@ -1,20 +1,17 @@
 // src/services/media.service.js
 import { prisma } from '../config/prisma.js';
 import cloudinary from '../config/cloudinary.js';
-import streamifier from 'streamifier'; // Ayuda a convertir el buffer en un stream
+import streamifier from 'streamifier'; 
 
 /**
  * Función auxiliar para subir un 'buffer' (archivo en memoria) a Cloudinary.
- * @param {Buffer} fileBuffer El buffer del archivo desde multer
- * @param {string} folder La carpeta en Cloudinary donde se guardará
- * @returns {Promise<object>} Promesa que resuelve con el resultado de Cloudinary
  */
 const uploadStream = (fileBuffer, folder) => {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: folder, 
-        resource_type: 'auto', // Detecta si es imagen, video, etc.
+        resource_type: 'auto', 
       },
       (error, result) => {
         if (error) {
@@ -32,17 +29,13 @@ const uploadStream = (fileBuffer, folder) => {
 export const mediaService = {
 
   /**
-   * --- ¡MODIFICADO! ---
    * Sube un archivo a Cloudinary y guarda su referencia en la BD.
-   * @param {object} file - El objeto 'file' de multer
-   * @param {string} customFileName - El nombre de archivo (editado) enviado desde el frontend
    */
   upload: async (file, customFileName) => {
     if (!file) {
       throw new Error('No se proporcionó ningún archivo para subir.');
     }
 
-    // 1. Determinar el tipo y la carpeta
     let fileType = 'file';
     if (file.mimetype.startsWith('image/')) {
       fileType = 'image';
@@ -50,26 +43,21 @@ export const mediaService = {
       fileType = 'video';
     }
     
-    const folder = `petschile/${fileType}s`; // Ej: petschile/images
+    const folder = `petschile/${fileType}s`; 
 
     try {
-      // 2. Subir el archivo a Cloudinary
       const uploadResult = await uploadStream(file.buffer, folder);
 
-      // 3. Guardar la referencia en nuestra base de datos PostgreSQL
       const newMediaFile = await prisma.mediaFile.create({
         data: {
-          // --- ¡LÓGICA ACTUALIZADA! ---
-          // Usa el nombre personalizado si existe, si no, usa el original
           fileName: customFileName || file.originalname,
-          // --- FIN ---
           url: uploadResult.secure_url,
           publicId: uploadResult.public_id,
           fileType: fileType,
         },
       });
 
-      return newMediaFile; // Devolvemos el registro de nuestra BD
+      return newMediaFile; 
 
     } catch (error) {
       console.error('Error al subir el archivo a Cloudinary o guardar en BD:', error);
@@ -78,31 +66,34 @@ export const mediaService = {
   },
 
   /**
-   * --- ¡MODIFICADO Y RENOMBRADO! ---
-   * Obtiene todos los archivos de forma paginada, filtrada y ordenada.
+   * Obtiene todos los archivos de forma paginada, filtrada, ordenada y buscada.
    */
   findPaginated: async (options = {}) => {
-    // 1. Definimos los valores por defecto
     const {
       page = 1,
-      limit = 50, // Límite por defecto de 50
-      sortBy = 'createdAt', // Ordenar por fecha de creación por defecto
-      sortOrder = 'desc', // Más nuevos primero
-      filterType = null // "image", "video", "file", o null (todos)
+      limit = 50, 
+      sortBy = 'createdAt', 
+      sortOrder = 'desc', 
+      filterType = null,
+      search = null 
     } = options;
 
-    // 2. Calculamos las opciones de Prisma
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const take = parseInt(limit);
     const orderBy = { [sortBy]: sortOrder };
 
-    // 3. Construimos el 'where' dinámico para el filtro
     const where = {};
     if (filterType && ['image', 'video', 'file'].includes(filterType)) {
       where.fileType = filterType;
     }
+    
+    if (search) {
+      where.fileName = {
+        contains: search,
+        mode: 'insensitive', 
+      };
+    }
 
-    // 4. Ejecutamos la consulta paginada
     return await prisma.mediaFile.findMany({
       where,
       skip,
@@ -112,30 +103,34 @@ export const mediaService = {
   },
 
   /**
-   * --- ¡NUEVO! ---
-   * Cuenta el total de archivos para la paginación (respetando filtros).
+   * Cuenta el total de archivos (respetando filtros y búsqueda).
    */
   countAll: async (options = {}) => {
-    const { filterType = null } = options;
+    const { 
+      filterType = null,
+      search = null 
+    } = options;
     
-    // Construimos el 'where' dinámico
     const where = {};
     if (filterType && ['image', 'video', 'file'].includes(filterType)) {
       where.fileType = filterType;
     }
 
-    // Ejecutamos la consulta de conteo
+    if (search) {
+      where.fileName = {
+        contains: search,
+        mode: 'insensitive',
+      };
+    }
+
     return await prisma.mediaFile.count({ where });
   },
 
   /**
-   * --- ¡MODIFICADO! ---
    * Elimina un archivo de Cloudinary y de la base de datos.
-   * (Maneja diferentes resource_type)
    */
   delete: async (id) => {
     try {
-      // 1. Encontrar el registro en nuestra BD
       const file = await prisma.mediaFile.findUnique({
         where: { id },
       });
@@ -144,20 +139,17 @@ export const mediaService = {
         throw new Error('Archivo no encontrado en la base de datos.');
       }
 
-      // 2. Determinar el resource_type para Cloudinary
-      let resourceType = 'raw'; // 'raw' es para archivos genéricos (pdf, zip, etc.)
+      let resourceType = 'raw'; 
       if (file.fileType === 'image') {
         resourceType = 'image';
       } else if (file.fileType === 'video') {
         resourceType = 'video';
       }
 
-      // 3. Pedir a Cloudinary que borre el archivo
       await cloudinary.uploader.destroy(file.publicId, {
         resource_type: resourceType
       });
 
-      // 4. Borrar el registro de nuestra BD
       await prisma.mediaFile.delete({
         where: { id },
       });
@@ -169,4 +161,39 @@ export const mediaService = {
       throw new Error('Error al eliminar el archivo.');
     }
   },
+
+  /**
+   * Calcula estadísticas agregadas sobre los archivos de medios.
+   */
+  getStats: async () => {
+    try {
+      // Ejecutamos el conteo total y el conteo por grupos en paralelo
+      const [totalFiles, typeGroups] = await Promise.all([
+        // 1. Total de archivos
+        prisma.mediaFile.count(),
+        
+        // 2. Conteo agrupado por 'fileType'
+        prisma.mediaFile.groupBy({
+          by: ['fileType'],
+          _count: {
+            _all: true, // Contará todos los registros en cada grupo
+          },
+        })
+      ]);
+      const countsByType = typeGroups.reduce((acc, group) => {
+        acc[group.fileType] = group._count._all;
+        return acc;
+      }, {});
+
+      return {
+        totalFiles,
+        ...countsByType // Desplegamos las claves (image, video, file)
+      };
+
+    } catch (error) {
+      console.error('Error al calcular estadísticas de medios:', error);
+      throw new Error('Error al calcular estadísticas de medios.');
+    }
+  }
+
 };

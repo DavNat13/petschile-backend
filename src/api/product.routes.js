@@ -2,7 +2,6 @@
 import { Router } from 'express';
 import { productController } from '../controllers/product.controller.js';
 import { checkJwt, checkRole } from '../middlewares/auth.middleware.js';
-// Importamos 'validateProduct' pero ya no lo usaremos en POST/PATCH
 import { validateProduct } from '../middlewares/validation.middleware.js'; 
 
 const router = Router();
@@ -14,7 +13,6 @@ router.get('/:id', productController.getOne);
 router.get('/', productController.getAll);
 
 
-// --- ¡NUEVA RUTA DE ADMIN! ---
 /**
  * @route   GET /api/products/admin/list
  * @desc    (Admin) Obtiene TODOS los productos (activos y archivados)
@@ -35,9 +33,6 @@ router.get(
  */
 router.post(
   '/',
-  // --- CORRECCIÓN ---
-  // Se eliminó 'validateProduct' de este array.
-  // La validación compleja de Prisma la maneja el servicio.
   [checkJwt, checkRole(['ADMIN', 'SELLER'])], 
   productController.create
 );
@@ -49,13 +44,10 @@ router.post(
  */
 router.patch(
   '/:id',
-  // --- CORRECCIÓN ---
-  // Se eliminó 'validateProduct' de este array.
   [checkJwt, checkRole(['ADMIN', 'SELLER'])], 
   productController.update
 );
 
-// --- ¡NUEVA RUTA DE ADMIN! ---
 /**
  * @route   PATCH /api/products/:id/restore
  * @desc    (Admin/Seller) Restaura un producto archivado

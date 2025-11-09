@@ -3,20 +3,23 @@ import { prisma } from '../config/prisma.js';
 
 export const orderService = {
   /**
-   * Crea un nuevo pedido. Esta es una transacción atómica:
-   * 1. Crea el Pedido (Order)
-   * 2. Crea los Items del Pedido (OrderItems)
-   * 3. Verifica y descuenta el stock de los Productos
-   * Si algo falla (ej. no hay stock), TODA la operación se revierte.
-   *
-   * --- ¡MODIFICADO! ---
-   * 1. Añadimos 'orderId' a la firma de la función
+   * Crea un nuevo pedido.
+   * (Esta función no cambia)
    */
   create: async (userId, items, shippingInfo, shippingCost, total, orderId) => {
     
     return await prisma.$transaction(async (tx) => {
       // 1. Verificar stock y preparar datos de items
       const itemData = [];
+      const userCart = await tx.cart.findUnique({
+        where: { userId },
+        select: { id: true }
+      });
+      
+      if (!userCart) {
+        throw new Error('No se encontró el carrito del usuario.');
+      }
+
       for (const item of items) {
         const product = await tx.product.findUnique({
           where: { id: item.productId },
@@ -26,7 +29,6 @@ export const orderService = {
           throw new Error(`Stock insuficiente para ${product?.nombre || item.productId}`);
         }
         
-        // Usamos el precio de oferta si existe y es válido
         const priceToUse = (product.precioOferta > 0 && product.precioOferta < product.precio) 
             ? product.precioOferta 
             : product.precio;
@@ -34,26 +36,25 @@ export const orderService = {
         itemData.push({
           productId: item.productId,
           quantity: item.quantity,
-          priceAtPurchase: priceToUse, // Guarda el precio exacto de la compra
+          priceAtPurchase: priceToUse, 
         });
       }
 
       // 2. Crear el Pedido y los OrderItems anidados
       const order = await tx.order.create({
         data: {
-          // --- ¡ESTA ES LA MODIFICACIÓN! ---
-          orderId: orderId, // 2. Añadimos el orderId al guardar en la BD
+          orderId: orderId, 
           userId,
           total,
           shippingCost,
-          shippingInfo, // Esto es el objeto JSON con los datos de envío
+          shippingInfo, 
           status: 'Procesando',
           items: {
-            create: itemData, // Crea los OrderItem anidados
+            create: itemData, 
           },
         },
         include: {
-          items: true, // Devuelve el pedido con sus items
+          items: true, 
         }
       });
 
@@ -64,9 +65,17 @@ export const orderService = {
           data: { stock: { decrement: item.quantity } },
         })
       );
-      
-      // Ejecutamos todas las actualizaciones de stock
       await Promise.all(stockUpdates);
+
+      // 4. Vaciar los items comprados del carrito
+      await tx.cartItem.deleteMany({
+        where: {
+          cartId: userCart.id,
+          productId: {
+            in: items.map(item => item.productId) 
+          }
+        }
+      });
       
       return order; // Devuelve el pedido completo
     });
@@ -74,7 +83,6 @@ export const orderService = {
 
   /**
    * Encuentra todos los pedidos de un usuario específico.
-   * (Esta función ya devuelve 'orderId' implícitamente)
    */
   findByUser: async (userId) => {
     return await prisma.order.findMany({
@@ -83,7 +91,7 @@ export const orderService = {
       include: {
         items: {
           include: {
-            product: true // Incluye la info del producto en cada item
+            product: true 
           }
         }
       }
@@ -92,24 +100,30 @@ export const orderService = {
 
   /**
    * Encuentra todos los pedidos (para Admin/Vendedor).
-   * (Esta función ya devuelve 'orderId' implícitamente)
    */
   findAll: async () => {
     return await prisma.order.findMany({
       orderBy: { orderDate: 'desc' },
-      include: { user: { select: { nombre: true, email: true } } } // Incluye info básica del usuario
+      include: { 
+        user: { 
+          select: { 
+            nombre: true, 
+            apellidos: true,
+            email: true 
+          } 
+        } 
+      }
     });
   },
 
   /**
    * Encuentra un pedido único por ID (para Admin/Vendedor).
-   * (Esta función ya devuelve 'orderId' implícitamente)
    */
   findOne: async (id) => {
     return await prisma.order.findUnique({
       where: { id },
       include: {
-        user: { select: { nombre: true, email: true, run: true } },
+        user: { select: { nombre: true, apellidos: true, email: true, run: true } }, // (Este ya estaba bien)
         items: {
           include: {
             product: true

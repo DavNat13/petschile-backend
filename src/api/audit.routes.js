@@ -14,9 +14,16 @@ router.use(checkRole(['ADMIN']));
 
 /**
  * @route   GET /api/audit
- * @desc    Obtiene todos los registros de auditoría
+ * @desc    Obtiene todos los registros de auditoría (filtrados)
  * @access  Private (Admin)
  */
 router.get('/', asyncHandler(auditController.getAll));
+
+/**
+ * @route   GET /api/audit/stats
+ * @desc    Obtiene estadísticas de auditoría para el dashboard
+ * @access  Private (Admin)
+ */
+router.get('/stats', asyncHandler(auditController.getStats));
 
 export default router;

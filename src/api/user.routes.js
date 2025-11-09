@@ -2,7 +2,6 @@
 import { Router } from 'express';
 import { userController } from '../controllers/user.controller.js';
 import { checkJwt, checkRole } from '../middlewares/auth.middleware.js';
-// (Aquí crearías middlewares 'validateUser' si es necesario)
 
 const router = Router();
 

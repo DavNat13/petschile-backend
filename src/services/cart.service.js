@@ -36,17 +36,12 @@ export const cartService = {
           include: {
             product: {
               include: {
-                category: true, // Incluimos la categoría
-                
-                // --- ¡CORRECCIÓN AQUÍ! ---
-                // La marca (brand) ahora se incluye directamente desde el producto.
+                category: true,
                 brand: true, 
-                // Y 'alimento' ya no necesita incluir 'brand'.
                 alimento: true,
                 juguete: true,
                 accesorio: true,
                 higiene: true,
-                // --- FIN DE CORRECCIÓN ---
               }
             }
           },
