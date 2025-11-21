@@ -5,11 +5,9 @@ import jwt from 'jsonwebtoken';
 import 'dotenv/config';
 import { userSelect } from './user.service.js'; 
 
-
 export const authService = {
   /**
    * Registra un nuevo usuario en la base de datos.
-   * (Esta función no cambia)
    */
   register: async (data) => {
     // 1. Hashear la contraseña
@@ -28,6 +26,7 @@ export const authService = {
     }
 
     // 4. Crear el usuario
+    // Convertir regionId y comunaId a enteros si están presentes
     const newUser = await prisma.user.create({
       data: {
         email: data.email,
@@ -41,7 +40,7 @@ export const authService = {
         regionId: data.regionId ? parseInt(data.regionId) : null,
         comunaId: data.comunaId ? parseInt(data.comunaId) : null,
       },
-      select: userSelect, // Devuelve solo los campos seguros
+      select: userSelect, 
     });
     
     return newUser;
@@ -63,32 +62,34 @@ export const authService = {
       return null; // Usuario no encontrado
     }
 
-    //  Comparar la contraseña enviada con la hasheada en la BD
+    // Comparar la contraseña enviada con la hasheada en la BD
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
       return null; // Contraseña incorrecta
     }
 
-    // Si todo es correcto, crear el payload para el token (ligero)
-    // (El payload del token sigue siendo ligero, solo lo esencial)
+    // Crear el payload para el token
     const payload = {
       id: user.id,
       email: user.email,
       role: user.role.nombre, 
     };
 
-    //   Firmar el token JWT
+    // Firmar el token JWT
     const token = jwt.sign(
       payload,
       process.env.JWT_SECRET,
       { expiresIn: '8h' } 
     );
-    // Devolvemos el token y el objeto de usuario COMPLETO
-    // Eliminamos la contraseña hasheada antes de devolverla
+    // Eliminar la contraseña del objeto user antes de devolverlo    
     delete user.password; 
     
-    // Devolvemos el objeto 'user' completo que obtuvimos de 'userSelect'
-    return { token, user };
+    // Ajustar el formato del role en la respuesta
+    const userFixed = {
+      ...user,
+      role: user.role ? user.role.nombre : null // Extraemos solo el string
+    };
+    return { token, user: userFixed };
   },
 };
